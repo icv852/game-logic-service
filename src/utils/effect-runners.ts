@@ -10,7 +10,8 @@ export const handleHttpRequest = async (
     ctx: Context,
     requestBody: unknown,
     schema: ZodObject<any>,
-    handler: (validatedData: any) => Effect.Effect<any, any>
+    handler: (validatedData: any) => Effect.Effect<any, any>,
+    encode?: (data: any) => unknown
 ) => {
     const program = pipe(
         Effect.succeed(requestBody),
@@ -19,7 +20,7 @@ export const handleHttpRequest = async (
         Effect.match({
             onSuccess: (data) => {
                 ctx.status = HttpStatusCode.OK
-                ctx.body = { ...data }
+                ctx.body = encode ? encode(data) : { ...data }
                 logger.info(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. ${JSON.stringify(ctx.body)}`)
             },
             onFailure: (e: unknown) => {
