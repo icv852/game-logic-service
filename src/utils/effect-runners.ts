@@ -44,7 +44,7 @@ export const handleHttpRequest = async (
 
                 const message = e instanceof Error ? e.message : String(e)
                 ctx.status = HttpStatusCode.INTERNAL_SERVER_ERROR
-                ctx.body = { error: { error_code: "INTERNAL_SERVER_ERROR", message } }
+                ctx.body = { error: { error_code: "INTERNAL_SERVER_ERROR", message: "Internal server error." } }
                 logger.error(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. UNKNOWN_ERROR: ${message}`)
             },
         })
