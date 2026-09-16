@@ -3,7 +3,8 @@ import type { GameLogicError } from "../../utils/errors.js";
 import { Validation, Transition } from "./functions.js";
 import type { GameState, InProgressGameState, Move } from "./types.js";
 
-export const applyMove = (move: Move) => (state: InProgressGameState): Effect.Effect<GameState, GameLogicError> => {
+export const applyMove = (data: { move: Move, state: InProgressGameState }): Effect.Effect<GameState, GameLogicError> => {
+    const { move, state } = data
     return pipe(
         Effect.succeed(state),
         Effect.flatMap(Validation.failIfInvalidMove(move)),
