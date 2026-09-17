@@ -1,12 +1,13 @@
+import { randomUUID } from "node:crypto";
 import { Cause, Effect, Option, pipe, Schema } from "effect";
 import type { Context } from "koa";
 import HttpStatusCode from "../constants/http-status-code.js";
 import { isAppError, InvalidInputError } from "./errors.js";
 import logger from "./logger.js";
 
-const setErrorResponse = (ctx: Context, status: number, errorCode: string, message: string) => {
+const setErrorResponse = (ctx: Context, status: number, errorId: string, errorCode: string, message: string) => {
     ctx.status = status
-    ctx.body = { error: { error_code: errorCode, message } }
+    ctx.body = { error: { error_id: errorId, error_code: errorCode, message } }
 }
 
 export const handleHttpRequest = async <A, E, B>(
@@ -20,10 +21,7 @@ export const handleHttpRequest = async <A, E, B>(
         Schema.decodeUnknownEffect(inputSchema)(requestBody),
         Effect.mapError((issue) => new InvalidInputError({ message: issue.message })),
         Effect.flatMap(handler),
-        Effect.flatMap((data) => outputSchema
-            ? Schema.encodeUnknownEffect(outputSchema)(data)
-            : Effect.succeed(data)
-        ),
+        Effect.flatMap(Schema.encodeUnknownEffect(outputSchema)),
         Effect.matchCause({
             onSuccess: (body) => {
                 ctx.status = HttpStatusCode.OK
@@ -31,26 +29,27 @@ export const handleHttpRequest = async <A, E, B>(
                 logger.info(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. ${JSON.stringify(ctx.body)}`)
             },
             onFailure: (cause) => {
+                const errorId = randomUUID()
                 const failure = Cause.findErrorOption(cause)
 
                 // handle defect
                 if (Option.isNone(failure)) {
-                    setErrorResponse(ctx, HttpStatusCode.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "Internal server error.")
-                    logger.error(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. DEFECT:\n${Cause.pretty(cause)}`)
+                    setErrorResponse(ctx, HttpStatusCode.INTERNAL_SERVER_ERROR, errorId, "INTERNAL_SERVER_ERROR", "Internal server error.")
+                    logger.error(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. [${errorId}] DEFECT:\n${Cause.pretty(cause)}`)
                     return
                 }
 
                 const error = failure.value
                 if (isAppError(error)) {
                     const message = error.message ?? "Request failed."
-                    setErrorResponse(ctx, error.httpStatusCode, error._tag, message)
-                    logger.error(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. ${error._tag}: ${message}`)
+                    setErrorResponse(ctx, error.httpStatusCode, errorId, error._tag, message)
+                    logger.error(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. [${errorId}] ${error._tag}: ${message}`)
                     return
                 }
 
                 const message = error instanceof Error ? error.message : String(error)
-                setErrorResponse(ctx, HttpStatusCode.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "Internal server error.")
-                logger.error(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. UNKNOWN_ERROR: ${message}`)
+                setErrorResponse(ctx, HttpStatusCode.INTERNAL_SERVER_ERROR, errorId, "INTERNAL_SERVER_ERROR", "Internal server error.")
+                logger.error(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. [${errorId}] UNKNOWN_ERROR: ${message}`)
             },
         })
     )
