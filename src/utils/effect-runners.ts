@@ -1,26 +1,33 @@
-import { Cause, Effect, Option, pipe } from "effect";
+import { Cause, Effect, Option, pipe, Schema } from "effect";
 import type { Context } from "koa";
 import HttpStatusCode from "../constants/http-status-code.js";
-import { CustomError } from "./errors.js";
-import { ZodObject } from "zod";
+import { isAppError, InvalidInputError } from "./errors.js";
 import logger from "./logger.js";
-import { validateByZodSchema } from "./validator.js";
 
-export const handleHttpRequest = async (
+const setErrorResponse = (ctx: Context, status: number, errorCode: string, message: string) => {
+    ctx.status = status
+    ctx.body = { error: { error_code: errorCode, message } }
+}
+
+export const handleHttpRequest = async <A, E, B>(
     ctx: Context,
     requestBody: unknown,
-    schema: ZodObject<any>,
-    handler: (validatedData: any) => Effect.Effect<any, any>,
-    encode?: (data: any) => unknown
-) => {
+    inputSchema: Schema.Codec<A, unknown>,
+    handler: (validatedData: A) => Effect.Effect<B, E>,
+    outputSchema: Schema.Codec<B, unknown>
+): Promise<void> => {
     const program = pipe(
-        Effect.succeed(requestBody),
-        Effect.flatMap(validateByZodSchema(schema)),
+        Schema.decodeUnknownEffect(inputSchema)(requestBody),
+        Effect.mapError((issue) => new InvalidInputError({ message: issue.message })),
         Effect.flatMap(handler),
+        Effect.flatMap((data) => outputSchema
+            ? Schema.encodeUnknownEffect(outputSchema)(data)
+            : Effect.succeed(data)
+        ),
         Effect.matchCause({
-            onSuccess: (data) => {
+            onSuccess: (body) => {
                 ctx.status = HttpStatusCode.OK
-                ctx.body = encode ? encode(data) : { ...data }
+                ctx.body = body
                 logger.info(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. ${JSON.stringify(ctx.body)}`)
             },
             onFailure: (cause) => {
@@ -28,23 +35,21 @@ export const handleHttpRequest = async (
 
                 // handle defect
                 if (Option.isNone(failure)) {
-                    ctx.status = HttpStatusCode.INTERNAL_SERVER_ERROR
-                    ctx.body = { error: { error_code: "INTERNAL_SERVER_ERROR", message: "Internal server error." } }
+                    setErrorResponse(ctx, HttpStatusCode.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "Internal server error.")
                     logger.error(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. DEFECT:\n${Cause.pretty(cause)}`)
                     return
                 }
 
-                const e = failure.value
-                if (e instanceof CustomError) {
-                    ctx.status = e.statusCode
-                    ctx.body = { error: { error_code: e.errorCode, message: e.message } }
-                    logger.error(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. ${e.errorCode}: ${e.message}`)
+                const error = failure.value
+                if (isAppError(error)) {
+                    const message = error.message ?? "Request failed."
+                    setErrorResponse(ctx, error.httpStatusCode, error._tag, message)
+                    logger.error(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. ${error._tag}: ${message}`)
                     return
                 }
 
-                const message = e instanceof Error ? e.message : String(e)
-                ctx.status = HttpStatusCode.INTERNAL_SERVER_ERROR
-                ctx.body = { error: { error_code: "INTERNAL_SERVER_ERROR", message: "Internal server error." } }
+                const message = error instanceof Error ? error.message : String(error)
+                setErrorResponse(ctx, HttpStatusCode.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "Internal server error.")
                 logger.error(`${ctx.status} ${ctx.request.method} ${ctx.request.path}. UNKNOWN_ERROR: ${message}`)
             },
         })

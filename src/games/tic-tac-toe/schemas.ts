@@ -1,44 +1,50 @@
 import { Schema } from "effect"
 
-export const Player = Schema.Literals(["X", "O"])
-export type Player = Schema.Schema.Type<typeof Player>
+export const PlayerSchema = Schema.Literals(["X", "O"])
+export type Player = Schema.Schema.Type<typeof PlayerSchema>
 
-export const Position = Schema.Literals([0, 1, 2, 3, 4, 5, 6, 7, 8])
-export type Position = Schema.Schema.Type<typeof Position>
+export const PositionSchema = Schema.Literals([0, 1, 2, 3, 4, 5, 6, 7, 8])
+export type Position = Schema.Schema.Type<typeof PositionSchema>
 
-const Cell = Schema.OptionFromNullOr(Player)
+const CellSchema = Schema.OptionFromNullOr(PlayerSchema)
 
-export const Board = Schema.Tuple([Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell])
-export type Board = Schema.Schema.Type<typeof Board>
+export const BoardSchema = Schema.Tuple([CellSchema, CellSchema, CellSchema, CellSchema, CellSchema, CellSchema, CellSchema, CellSchema, CellSchema])
+export type Board = Schema.Schema.Type<typeof BoardSchema>
 
-const InProgressContext = Schema.Struct({
+const InProgressContextSchema = Schema.Struct({
     status: Schema.Literal("in-progress"),
-    currentPlayer: Player,
+    currentPlayer: PlayerSchema,
 })
 
-const WinContext = Schema.Struct({
+const WinContextSchema = Schema.Struct({
     status: Schema.Literal("win"),
-    winner: Player,
+    winner: PlayerSchema,
 })
 
-const DrawContext = Schema.Struct({
+const DrawContextSchema = Schema.Struct({
     status: Schema.Literal("draw"),
 })
 
-export const Context = Schema.Union([InProgressContext, WinContext, DrawContext])
-export type Context = Schema.Schema.Type<typeof Context>
+export const ContextSchema = Schema.Union([InProgressContextSchema, WinContextSchema, DrawContextSchema])
+export type Context = Schema.Schema.Type<typeof ContextSchema>
 
-export const Move = Schema.Struct({
-    position: Position,
-    player: Player,
+export const MoveSchema = Schema.Struct({
+    position: PositionSchema,
+    player: PlayerSchema,
 })
-export type Move = Schema.Schema.Type<typeof Move>
+export type Move = Schema.Schema.Type<typeof MoveSchema>
 
-export const GameState = Schema.Struct({
-    board: Board,
-    context: Context,
+export const GameStateSchema = Schema.Struct({
+    board: BoardSchema,
+    context: ContextSchema,
 })
-export type GameState = Schema.Schema.Type<typeof GameState>
+export type GameState = Schema.Schema.Type<typeof GameStateSchema>
+
+export const ApplyMoveSchema = Schema.Struct({
+    move: MoveSchema,
+    state: GameStateSchema,
+})
+export type ApplyMove = Schema.Schema.Type<typeof ApplyMoveSchema>
 
 
 

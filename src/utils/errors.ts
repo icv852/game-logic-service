@@ -1,6 +1,13 @@
 import HTTP_STATUS_CODE from "../constants/http-status-code.js";
 import { Schema } from "effect";
 
+export type AppError = BadRequestError | InternalError | InvalidInputError | GameLogicError
+export const isAppError = (error: unknown): error is AppError =>
+    error instanceof BadRequestError
+    || error instanceof GameLogicError
+    || error instanceof InternalError
+    || error instanceof InvalidInputError
+
 export class BadRequestError extends Schema.TaggedError<BadRequestError>()("BAD_REQUEST", {
   message: Schema.optional(Schema.String)
 }) {

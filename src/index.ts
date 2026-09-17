@@ -1,6 +1,5 @@
 import http from "http"
 import logger from "./utils/logger.js"
-import { formatErrorLog } from "./utils/errors.js"
 import createKoaApp from "./app.js"
 
 const PORT = Number(process.env.PORT ?? 3000)
@@ -8,6 +7,13 @@ const SHUTDOWN_TIMEOUT_MS = 10_000
 
 let server: http.Server | undefined
 let isShuttingDown = false
+
+const formatSystemError = (message: string, error: unknown): string => {
+    const detail = error instanceof Error
+        ? `${error.name}: ${error.message}\n${error.stack ?? ""}`
+        : String(error)
+    return message ? `${message} ${detail}` : detail
+}
 
 const exitWithDelay = (exitCode: number): void => {
     setTimeout(() => {
@@ -36,7 +42,7 @@ const gracefulShutdown = (signal: string): void => {
     server.close((err) => {
         clearTimeout(forceExitTimer)
         if (err) {
-            logger.error(formatErrorLog("Error while closing server.", err))
+            logger.error(formatSystemError("Error while closing server.", err))
             exitWithDelay(1)
             return
         }
@@ -50,18 +56,18 @@ const main = (): void => {
         const app = createKoaApp()
         server = app.listen(PORT, () => logger.info(`Server listening on port ${PORT}`))
     } catch (e) {
-        logger.fatal(formatErrorLog("Failed to start server.", e))
+        logger.fatal(formatSystemError("Failed to start server.", e))
         exitWithDelay(1)
     }
 }
 
 process.on("uncaughtException", e => {
-    logger.error(`Uncaught Exception: ${formatErrorLog("", e)}`)
+    logger.error(`Uncaught Exception: ${formatSystemError("", e)}`)
     exitWithDelay(1)
 })
 
 process.on("unhandledRejection", (reason) => {
-    logger.error(`Unhandled Rejection: ${formatErrorLog("", reason)}`)
+    logger.error(`Unhandled Rejection: ${formatSystemError("", reason)}`)
     exitWithDelay(1)
 })
 
