@@ -1,4 +1,4 @@
-import type { Position } from "./types.js";
+import type { Position } from "./schemas.js";
 
 export const WINNING_PATTERNS: readonly [Position, Position, Position][] = [
     // row

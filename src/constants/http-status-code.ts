@@ -25,7 +25,7 @@ The server is not ready to handle the request, often temporary due to maintenanc
 
 */
 
-enum HttpStatusCode {
+enum HTTP_STATUS_CODE {
     OK = 200,
     CREATED = 201,
     NO_CONTENT = 204,
@@ -39,4 +39,4 @@ enum HttpStatusCode {
     SERVICE_UNAVAILABLE = 503,
 }
 
-export default HttpStatusCode
+export default HTTP_STATUS_CODE
